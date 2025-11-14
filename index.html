@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Chatter Online — Discord-like UI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#071022;
+  --panel:#0b1220;
+  --muted:#98a1b3;
+  --accent:#5865f2;
+  --accent-2:#6c7bff;
+  --glass: rgba(255,255,255,0.03);
+  --success:#43d18d;
+  --danger:#ff7070;
+  --radius:12px;
+  --shadow: 0 8px 30px rgba(2,6,23,0.6);
+  color-scheme: dark;
+}
+*{box-sizing:border-box}
+html,body,#app{height:100%}
+body{
+  margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, 'Helvetica Neue', Arial;color:#e6eef8;
+  background: radial-gradient(1000px 500px at 10% 8%, rgba(108,123,255,0.06), transparent), linear-gradient(180deg,#04101a,#061025);
+  -webkit-font-smoothing:antialiased;
+}
+/* Layout */
+.app{display:grid;grid-template-columns:72px 260px 1fr 300px;grid-gap:18px;height:100vh;padding:18px}
+/* Servers column */
+.servers{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:var(--radius);padding:12px 8px;display:flex;flex-direction:column;gap:10px;align-items:center;box-shadow:var(--shadow);}
+.server{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;cursor:pointer;transition:transform .18s,box-shadow .18s}
+.server:hover{transform:translateY(-6px) rotate(-3deg);box-shadow:0 14px 40px rgba(92,101,255,0.12)}
+.server.active{background:linear-gradient(135deg,var(--accent),var(--accent-2));color:white;box-shadow:0 12px 36px rgba(92,101,255,0.16)}
+.add-server{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px dashed rgba(255,255,255,0.04);cursor:pointer;transition:all .18s}
+.add-server:hover{transform:scale(1.06);border-color:rgba(255,255,255,0.09)}
+/* Sidebar - channels */
+.sidebar{background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01));border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.server-header{display:flex;align-items:center;gap:10px}
+.server-title{font-weight:700}
+.channels{flex:1;overflow:auto;padding-right:6px}
+.category{font-size:12px;color:var(--muted);text-transform:uppercase;margin:12px 0 6px}
+.channel{padding:8px 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--muted);transition:background .12s,transform .12s}
+.channel:hover{background:var(--glass);color:#e9f0ff;transform:translateX(6px)}
+.channel.active{background:rgba(88,101,242,0.12);color:var(--accent-2);font-weight:700}
+/* Main chat */
+.chat{background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));border-radius:var(--radius);padding:18px;display:flex;flex-direction:column;box-shadow:var(--shadow);overflow:hidden}
+.chat-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.room-info{display:flex;align-items:center;gap:12px}
+.room-avatar{width:56px;height:56px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent-2));display:flex;align-items:center;justify-content:center;font-weight:800}
+.room-meta{line-height:1}
+.room-meta b{display:block}
+.messages{flex:1;overflow:auto;padding-right:10px;padding-bottom:12px}
+.message{display:flex;gap:12px;padding:6px 0}
+.msg-avatar{width:44px;height:44px;border-radius:8px;background:#0e1824;display:flex;align-items:center;justify-content:center;color:var(--accent-2);font-weight:700}
+.msg-body{max-width:80%}
+.msg-header{display:flex;gap:8px;align-items:center}
+.msg-author{font-weight:700;margin-right:6px}
+.msg-time{font-size:12px;color:var(--muted)}
+.msg-text{margin-top:6px;line-height:1.45;color:#dfe9ff}
+/* Composer */
+.composer{display:flex;gap:12px;align-items:end;padding-top:10px;border-top:1px solid rgba(255,255,255,0.02)}
+.composer .input{flex:1;background:linear-gradient(180deg, rgba(255,255,255,0.02), transparent);border-radius:10px;padding:12px 14px;min-height:48px;outline:none;color:inherit;border:1px solid rgba(255,255,255,0.02);resize:none}
+.send-btn{background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:10px;padding:10px 14px;border:none;color:white;font-weight:700;cursor:pointer;transition:transform .12s}
+.send-btn:hover{transform:translateY(-4px)}
+/* Right panel */
+.right{background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01));border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:12px;overflow:auto}
+.members-list{display:flex;flex-direction:column;gap:10px}
+.member{display:flex;gap:10px;align-items:center}
+.member .avatar{width:36px;height:36px;border-radius:8px;background:#0d1820;display:flex;align-items:center;justify-content:center}
+.status{width:10px;height:10px;border-radius:50%}
+.status.online{background:var(--success)}
+/* Buttons animation utility */
+.btn{padding:8px 12px;border-radius:10px;border:0;cursor:pointer;font-weight:700;transition:transform .12s,box-shadow .12s}
+.btn:active{transform:translateY(2px) scale(.995)}
+.btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04)}
+.btn-primary{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:white}
+/* small screens */
+@media (max-width:900px){.app{grid-template-columns:64px 1fr;grid-template-rows:1fr 340px}.right{grid-column:1/-1;grid-row:2}.sidebar{display:none}}
+/* micro animation */
+.pulse{animation:pulse 2s infinite}
+@keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.02)}100%{transform:scale(1)}}
+</style>
+</head>
+<body>
+<div id="app" class="app" style="display:none">
+  <div class="servers" id="servers"></div>
+  <aside class="sidebar" id="sidebar">
+    <div class="server-header">
+      <div class="server-title">Chatter</div>
+      <div class="pill muted">beta</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="search" style="flex:1;display:flex;gap:8px;align-items:center;background:rgba(255,255,255,0.02);padding:8px;border-radius:10px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="11" cy="11" r="6" />
+          <path d="M21 21l-4.35-4.35"/>
+        </svg>
+        <input id="globalSearch" type="search" placeholder="Поиск" style="background:transparent;border:0;outline:none;color:inherit;width:100%">
+      </div>
+      <button id="openProfileBtn" class="btn btn-ghost" title="Профиль">Профиль</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-direction:column">
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="createServerBtn" class="btn btn-primary">Создать сервер</button>
+        <button id="createGroupBtn" class="btn btn-ghost">Создать группу</button>
+      </div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px">Серверы</div>
+    <div id="serversList" style="display:flex;flex-direction:column;gap:8px;overflow:auto;max-height:40vh;padding-right:6px"></div>
+  </aside>
+
+  <main class="chat" id="chat">
+    <div class="chat-header">
+      <div class="room-info">
+        <div class="room-avatar" id="roomAvatar">#</div>
+        <div class="room-meta"><b id="roomName">Добро пожаловать</b><span class="muted" id="roomDesc">Создайте сервер или присоединитесь</span></div>
+      </div>
+      <div class="muted">online · <span id="onlineCount">0</span></div>
+    </div>
+    <div class="messages" id="messages"><div style="color:var(--muted)">Чат пуст — начните новый сервер или группу.</div></div>
+    <div class="composer">
+      <input id="messageInput" class="input" placeholder="Введите сообщение"/>
+      <button id="sendBtn" class="send-btn">Отправить</button>
+    </div>
+  </main>
+
+  <aside class="right" id="right">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <div class="muted">Участники</div>
+      <div style="display:flex;gap:8px">
+        <button id="openFriendsBtn" class="btn btn-ghost">Друзья</button>
+      </div>
+    </div>
+    <div class="members-list" id="members"></div>
+  </aside>
+</div>
+
+<!-- Login/Register modal -->
+<div id="authModal" class="modal" style="display:flex;align-items:center;justify-content:center;background:rgba(2,6,23,0.9)">
+  <div class="card">
+    <h3>Вход / Регистрация</h3>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <input id="emailField" placeholder="Email" style="padding:10px;border-radius:8px;background:#071225;border:1px solid #152033;color:white"/>
+      <input id="passwordField" type="password" placeholder="Пароль" style="padding:10px;border-radius:8px;background:#071225;border:1px solid #152033;color:white"/>
+      <div style="display:flex;gap:8px">
+        <button id="loginBtn" class="btn btn-primary">Войти</button>
+        <button id="registerBtn" class="btn btn-ghost">Регистрация</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyBsNjqAnvlfzGtN10sidRxGl_jM8KpEgUQ",
+  authDomain: "ilovefurryu.firebaseapp.com",
+  projectId: "ilovefurryu",
+  storageBucket: "ilovefurryu.firebasestorage.app",
+  messagingSenderId: "968640002832",
+  appId: "1:968640002832:web:77be94bcb792c5ada2c395",
+  measurementId: "G-S4798MS2HL"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const appUI = document.getElementById('app');
+const authModal = document.getElementById('authModal');
+const emailField = document.getElementById('emailField');
+const passwordField = document.getElementById('passwordField');
+const loginBtn = document.getElementById('loginBtn');
+const registerBtn = document.getElementById('registerBtn');
+const messagesEl = document.getElementById('messages');
+const messageInput = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+
+let currentRoom = "general";
+
+// Авторизация
+registerBtn.onclick = () => {
+  const email = emailField.value;
+  const pass = passwordField.value;
+  createUserWithEmailAndPassword(auth, email, pass)
+    .then(user => console.log("Регистрация успешна", user))
+    .catch(err => alert(err.message));
+}
+
+loginBtn.onclick = () => {
+  const email = emailField.value;
+  const pass = passwordField.value;
+  signInWithEmailAndPassword(auth, email, pass)
+    .then(user => console.log("Вход успешен", user))
+    .catch(err => alert(err.message));
+}
+
+onAuthStateChanged(auth, user => {
+  if(user){
+    authModal.style.display = 'none';
+    appUI.style.display = 'grid';
+    initChat();
+  } else {
+    authModal.style.display = 'flex';
+    appUI.style.display = 'none';
+  }
+});
+
+// Чат онлайн
+function initChat(){
+  const messagesCol = collection(db, "messages");
+  const q = query(messagesCol, orderBy("timestamp"));
+  onSnapshot(q, snapshot => {
+    messagesEl.innerHTML = "";
+    snapshot.forEach(doc => {
+      const m = doc.data();
+      const div = document.createElement('div');
+      div.className = 'message';
+      div.innerHTML = `<div class="msg-avatar">${m.user.charAt(0).toUpperCase()}</div>
+      <div class="msg-body"><div class="msg-header"><div class="msg-author">${m.user}</div></div>
+      <div class="msg-text">${m.text}</div></div>`;
+      messagesEl.appendChild(div);
+    });
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  });
+}
+
+sendBtn.onclick = async () => {
+  const txt = messageInput.value.trim();
+  if(!txt) return;
+  const user = auth.currentUser;
+  if(!user) return alert('Не авторизован');
+  await addDoc(collection(db,"messages"),{
+    text: txt,
+    user: user.email.split('@')[0],
+    timestamp: Date.now()
+  });
+  messageInput.value = '';
+}
+
+messageInput.addEventListener('keydown', e => {
+  if(e.key==='Enter' && !e.shiftKey){
+    e.preventDefault();
+    sendBtn.click();
+  }
+});
+</script>
+</body>
+</html>
